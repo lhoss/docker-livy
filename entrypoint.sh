@@ -6,4 +6,9 @@ else
   export LIBPROCESS_IP=$HOST
 fi
 
-$LIVY_APP_PATH/bin/livy-server $@
+#new: CMD in Dockerfile starts livy (by default)
+#$LIVY_APP_PATH/bin/livy-server $@
+
+echo "entrypoint ENV : $LIVY_APP_PATH=${LIVY_APP_PATH}, $LIVY_HOME=${LIVY_HOME} LIBPROCESS_IP=${LIBPROCESS_IP}"
+echo "entrypoint exec: $@"
+exec "$@"

@@ -1,23 +1,39 @@
 #FROM ubuntu:14.04
-#MAINTAINER tobilg <tobilg@gmail.com>
+#orig MAINTAINER tobilg <tobilg@gmail.com>
+#MAINTAINER lhoss <laurent.hoss@gmail.com>
 FROM mesosphere/mesos:1.0.1-2.0.93.ubuntu1404
 
-# TODO needed?
+#ENV JDK_VERSION 7
+ENV JDK_VERSION 8
+ENV BUILD_DEPS='git maven python-setuptools python-dev build-essential'
+
+# TODO needed R repos?
 # Add R list
 RUN echo 'deb http://cran.rstudio.com/bin/linux/ubuntu trusty/' | sudo tee -a /etc/apt/sources.list.d/r.list && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
 
+# add openjdk repos (to add java-8)
+RUN apt-get update && \
+    apt-get install -y software-properties-common
+RUN add-apt-repository ppa:openjdk-r/ppa
+
 # packages
 RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \
     wget \
-    git \
-    openjdk-7-jdk \
-    maven \
+#    git \
+    openjdk-${JDK_VERSION}-jdk \
+#    python-setuptools python-dev build-essential \
+#    maven \
     libjansi-java \
     libsvn1 \
     libcurl3 \
     libsasl2-modules && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+### set default Java
+ENV JAVA_HOME /usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
+RUN update-alternatives --set java ${JAVA_HOME}/jre/bin/java
 
 # Overall ENV vars
 #ENV SPARK_VERSION 1.6.1
@@ -30,6 +46,8 @@ ENV LIVY_BUILD_VERSION livy-server-0.4.0-SNAPSHOT
 
 # Set install path for Livy
 ENV LIVY_APP_PATH /apps/$LIVY_BUILD_VERSION
+# Added HOME env, that points to a version-independent symlink of $LIVY_APP_PATH
+ENV LIVY_HOME /apps/livy
 
 # Set build path for Livy
 ENV LIVY_BUILD_PATH /apps/build/livy
@@ -41,31 +59,34 @@ ENV HADOOP_CONF_DIR /etc/hadoop/conf
 ENV SPARK_HOME /usr/local/spark
 
 # Set native Mesos library path
-ENV MESOS_NATIVE_JAVA_LIBRARY /usr/local/lib/libmesos.so
+#ENV MESOS_NATIVE_JAVA_LIBRARY /usr/local/lib/libmesos.so
 
 # Mesos install
 #RUN wget http://repos.mesosphere.com/ubuntu/pool/main/m/mesos/mesos_$MESOS_BUILD_VERSION.ubuntu1404_amd64.deb && \
 #    dpkg -i mesos_$MESOS_BUILD_VERSION.ubuntu1404_amd64.deb && \
 #    rm mesos_$MESOS_BUILD_VERSION.ubuntu1404_amd64.deb
 
-# TODO remove spark (we will mount it) or do we need spark for the build
-# TODO if yes, abstract version suffix 'hadoop2.6' (it's 2.7 for spark v2.1)
-# Spark ENV vars
 
-# TODO ensure build is done for spark-2
-# TODO add below to above apt cmds
-RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes   python-setuptools python-dev build-essential
-
-# Clone Livy repository
+# Clone Livy repository & build it
 RUN mkdir -p /apps/build && \
     cd /apps/build && \
+    apt-get update && apt-get install -yq --no-install-recommends --force-yes ${BUILD_DEPS} && \
 	git clone https://github.com/cloudera/livy.git && \
 	cd $LIVY_BUILD_PATH && \
     mvn -DskipTests -Dspark.version=$SPARK_VERSION clean package && \
     unzip $LIVY_BUILD_PATH/assembly/target/$LIVY_BUILD_VERSION.zip -d /apps && \
     rm -rf $LIVY_BUILD_PATH && \
+    rm -rf /root/.m2 && \
+    apt-get purge -y --auto-remove ${BUILD_DEPS} && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    ln -sn $LIVY_APP_PATH $LIVY_HOME && \
 	mkdir -p $LIVY_APP_PATH/upload
-	
+
+# add symlink for LIVY_HOME ENV
+#RUN cd / && ln -sn $LIVY_APP_PATH $LIVY_HOME
+
+#TODO run as non-root user !?
 # Add custom files, set permissions
 ADD entrypoint.sh .
 
@@ -75,3 +96,7 @@ RUN chmod +x entrypoint.sh
 EXPOSE 8998
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+# Note: need to use CMD with a shell to expand any ENV Vars
+#CMD ["${LIVY_HOME}/bin/livy-server"]
+CMD ["sh", "-c", "${LIVY_HOME}/bin/livy-server"]
