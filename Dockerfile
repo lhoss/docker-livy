@@ -49,20 +49,13 @@ ENV MESOS_NATIVE_JAVA_LIBRARY /usr/local/lib/libmesos.so
 #    rm mesos_$MESOS_BUILD_VERSION.ubuntu1404_amd64.deb
 
 # TODO remove spark (we will mount it) or do we need spark for the build
-# TODO if yes, abstract version suffux 'hadoop2.6' (it's 2.7 for spark v2.1)
+# TODO if yes, abstract version suffix 'hadoop2.6' (it's 2.7 for spark v2.1)
 # Spark ENV vars
-ENV SPARK_VERSION_STRING spark-$SPARK_VERSION-bin-hadoop2.6
-ENV SPARK_DOWNLOAD_URL http://d3kbcqa49mib13.cloudfront.net/$SPARK_VERSION_STRING.tgz
-
-# Download and unzip Spark
-RUN wget $SPARK_DOWNLOAD_URL && \
-    mkdir -p $SPARK_HOME && \
-    tar xvf $SPARK_VERSION_STRING.tgz -C /tmp && \
-    cp -rf /tmp/$SPARK_VERSION_STRING/* $SPARK_HOME && \
-    rm -rf -- /tmp/$SPARK_VERSION_STRING && \
-    rm spark-$SPARK_VERSION-bin-hadoop2.6.tgz
 
 # TODO ensure build is done for spark-2
+# TODO add below to above apt cmds
+RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes   python-setuptools python-dev build-essential
+
 # Clone Livy repository
 RUN mkdir -p /apps/build && \
     cd /apps/build && \
