@@ -43,6 +43,9 @@ ENV SPARK_VERSION 2.1.0
 # 0.3.0 released 2017-01-25
 # TODO better use latest stable  or latest ?!
 ENV LIVY_BUILD_VERSION livy-server-0.4.0-SNAPSHOT
+#ENV LIVY_COMMIT master
+# Latest build contains commits done upto 2017-04-09
+ENV LIVY_COMMIT 07f6072
 
 # Set install path for Livy
 ENV LIVY_APP_PATH /apps/$LIVY_BUILD_VERSION
@@ -73,6 +76,7 @@ RUN mkdir -p /apps/build && \
     apt-get update && apt-get install -yq --no-install-recommends --force-yes ${BUILD_DEPS} && \
 	git clone https://github.com/cloudera/livy.git && \
 	cd $LIVY_BUILD_PATH && \
+    git checkout -q $LIVY_COMMIT && \
     mvn -DskipTests -Dspark.version=$SPARK_VERSION clean package && \
     unzip $LIVY_BUILD_PATH/assembly/target/$LIVY_BUILD_VERSION.zip -d /apps && \
     rm -rf $LIVY_BUILD_PATH && \
