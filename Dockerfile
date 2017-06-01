@@ -99,6 +99,28 @@ RUN chmod +x entrypoint.sh
 # Expose port
 EXPOSE 8998
 
+# TODO enable container to see the base OS users and test LIVY 'proxyUser' param if it runs spark-submit as that user
+# add our user and group first to make sure their IDs get assigned consistently
+ENV LIVY_USER  insights
+ENV LIVY_GROUP insights
+RUN groupadd -r ${LIVY_GROUP} && useradd -r -m -g ${LIVY_GROUP} ${LIVY_USER}
+
+# only change the owner of those base dirs (and later in entrypoint script, recursively)
+#RUN chown  ${LIVY_USER}:${LIVY_GROUP} ${LIVY_HOME}/conf ${LIVY_HOME}/upload ${LIVY_HOME}/logs
+RUN chown  ${LIVY_USER}:${LIVY_GROUP} ${LIVY_HOME}/conf
+RUN chown  ${LIVY_USER}:${LIVY_GROUP} ${LIVY_HOME}/upload
+
+# Enable passwordless sudo for users under the "sudo" group
+# required for the entrypoint.sh 'sudo chown/chmod' cmds to work
+RUN sed -i.bkp -e \
+    's/%sudo\s\+ALL=(ALL\(:ALL\)\?)\s\+ALL/%sudo ALL=NOPASSWD:ALL/g' \
+    /etc/sudoers
+RUN adduser ${LIVY_USER} sudo
+
+
+# docker image layers following the 'USER' cmd, are owned by the given user !
+USER ${LIVY_USER}
+
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Note: need to use CMD with a shell to expand any ENV Vars
